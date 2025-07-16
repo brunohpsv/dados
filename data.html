@@ -1,77 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dados do Firestore</title>
+    <title>Dados Firestore</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
         body { font-family: Arial; padding: 20px; }
-        .collection { background: #f0f0f0; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
-        .document { background: white; padding: 10px; margin: 10px 0; border-left: 4px solid #4285f4; }
-        pre { white-space: pre-wrap; }
+        pre { background: #f0f0f0; padding: 10px; border-radius: 5px; }
+        .error { color: red; }
     </style>
 </head>
 <body>
     <h1>Dados do Firestore</h1>
-    <div id="data"></div>
+    <div id="result"></div>
 
     <script>
-        // Configuração direta do Firebase
-        firebase.initializeApp({
-            apiKey: "AIzaSyClmS9QnPH_HpLzN8mGW2s2PjfH4HXEAt8",
-            projectId: "horariosite-669d1"
-        });
-
-        const db = firebase.firestore();
-        const dataContainer = document.getElementById('data');
-
-        // Função para carregar e mostrar todos os dados
-        async function loadAllData() {
-            try {
-                // Primeiro obtém todas as coleções
-                const collections = await db.listCollections();
-                
-                if (collections.length === 0) {
-                    dataContainer.innerHTML = "<p>Nenhuma coleção encontrada.</p>";
+        // 1. Configuração do Firebase
+        try {
+            firebase.initializeApp({
+                apiKey: "AIzaSyClmS9QnPH_HpLzN8mGW2s2PjfH4HXEAt8",
+                projectId: "horariosite-669d1"
+            });
+            
+            const db = firebase.firestore();
+            
+            // 2. Teste direto - pega TODAS as coleções
+            db.listCollections().then(collections => {
+                if(collections.length === 0) {
+                    document.getElementById('result').innerHTML = 
+                        "<p class='error'>Nenhuma coleção encontrada no Firestore.</p>";
                     return;
                 }
-
-                // Para cada coleção, pega todos os documentos
-                for (const collectionRef of collections) {
-                    const collectionDiv = document.createElement('div');
-                    collectionDiv.className = 'collection';
-                    collectionDiv.innerHTML = `<h2>Coleção: ${collectionRef.id}</h2>`;
+                
+                // 3. Processa cada coleção
+                let output = "";
+                collections.forEach(collection => {
+                    output += `<h3>Coleção: ${collection.id}</h3>`;
                     
-                    const querySnapshot = await collectionRef.get();
-                    
-                    if (querySnapshot.empty) {
-                        collectionDiv.innerHTML += "<p>Nenhum documento nesta coleção.</p>";
-                    } else {
-                        querySnapshot.forEach(doc => {
-                            const docDiv = document.createElement('div');
-                            docDiv.className = 'document';
-                            docDiv.innerHTML = `
-                                <h3>ID: ${doc.id}</h3>
-                                <pre>${JSON.stringify(doc.data(), null, 2)}</pre>
-                            `;
-                            collectionDiv.appendChild(docDiv);
+                    // Pega todos os documentos desta coleção
+                    collection.get().then(snapshot => {
+                        snapshot.forEach(doc => {
+                            output += `<pre>${doc.id}: ${JSON.stringify(doc.data(), null, 2)}</pre>`;
                         });
-                    }
-                    
-                    dataContainer.appendChild(collectionDiv);
-                }
-            } catch (error) {
-                dataContainer.innerHTML = `
-                    <p style="color: red;">Erro ao carregar dados:</p>
-                    <pre>${error.message}</pre>
-                    <p>Verifique o console para detalhes.</p>
-                `;
+                        document.getElementById('result').innerHTML = output;
+                    });
+                });
+                
+            }).catch(error => {
+                document.getElementById('result').innerHTML = 
+                    `<p class='error'>ERRO: ${error.message}</p>`;
                 console.error("Erro completo:", error);
-            }
+            });
+            
+        } catch (initError) {
+            document.getElementById('result').innerHTML = 
+                `<p class='error'>Falha ao conectar: ${initError.message}</p>`;
         }
-
-        // Inicia o carregamento
-        loadAllData();
     </script>
 </body>
 </html>
