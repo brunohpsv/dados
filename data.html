@@ -17,10 +17,12 @@
         #auth-container { margin-bottom: 20px; }
         #password { padding: 8px; width: 200px; }
         #login-btn { padding: 8px 15px; background-color: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        #loading { margin: 20px; font-style: italic; }
+        #error { color: red; margin: 20px; }
     </style>
 </head>
 <body>
-    <div id="auth-container" class="hidden">
+    <div id="auth-container">
         <h1>Acesso Restrito</h1>
         <input type="password" id="password" placeholder="Digite a senha">
         <button id="login-btn">Acessar</button>
@@ -28,6 +30,8 @@
     
     <div id="content" class="hidden">
         <h1>Dados do Firestore</h1>
+        <div id="loading">Carregando dados...</div>
+        <div id="error" class="hidden"></div>
         <div id="collections"></div>
     </div>
 
@@ -39,10 +43,23 @@
         };
 
         // Inicializa o Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        try {
+            firebase.initializeApp(firebaseConfig);
+            console.log("Firebase inicializado com sucesso");
+            const db = firebase.firestore();
+            
+            // Teste de conexão
+            db.collection("test").doc("test").get()
+                .then(() => console.log("Conexão com Firestore OK"))
+                .catch(e => console.error("Erro ao conectar ao Firestore:", e));
+                
+        } catch (error) {
+            console.error("Erro ao inicializar Firebase:", error);
+            document.getElementById('error').textContent = `Erro ao inicializar Firebase: ${error.message}`;
+            document.getElementById('error').classList.remove('hidden');
+        }
 
-        // Senha para acesso (substitua por uma senha forte)
+        // Senha para acesso
         const PAGE_PASSWORD = "senhaSegura123";
 
         // Elementos da página
@@ -51,9 +68,8 @@
         const passwordInput = document.getElementById('password');
         const loginBtn = document.getElementById('login-btn');
         const collectionsContainer = document.getElementById('collections');
-
-        // Mostra o formulário de autenticação
-        authContainer.classList.remove('hidden');
+        const loadingElement = document.getElementById('loading');
+        const errorElement = document.getElementById('error');
 
         // Verifica a senha
         loginBtn.addEventListener('click', () => {
@@ -69,7 +85,17 @@
         // Carrega todas as coleções do Firestore
         async function loadCollections() {
             try {
+                loadingElement.textContent = "Carregando coleções...";
+                
                 const collections = await db.listCollections();
+                console.log("Coleções encontradas:", collections.map(c => c.id));
+                
+                if (collections.length === 0) {
+                    loadingElement.textContent = "Nenhuma coleção encontrada no banco de dados.";
+                    return;
+                }
+                
+                loadingElement.classList.add('hidden');
                 
                 for (const collectionRef of collections) {
                     const collectionName = collectionRef.id;
@@ -81,34 +107,50 @@
                     collectionDiv.appendChild(collectionTitle);
                     
                     // Carrega todos os documentos da coleção
-                    const querySnapshot = await collectionRef.get();
+                    try {
+                        loadingElement.textContent = `Carregando documentos da coleção ${collectionName}...`;
+                        loadingElement.classList.remove('hidden');
+                        
+                        const querySnapshot = await collectionRef.get();
+                        console.log(`Documentos em ${collectionName}:`, querySnapshot.size);
+                        
+                        if (querySnapshot.empty) {
+                            const emptyMsg = document.createElement('p');
+                            emptyMsg.textContent = 'Nenhum documento encontrado.';
+                            collectionDiv.appendChild(emptyMsg);
+                        } else {
+                            querySnapshot.forEach(doc => {
+                                const docDiv = document.createElement('div');
+                                docDiv.className = 'document';
                     
-                    if (querySnapshot.empty) {
-                        const emptyMsg = document.createElement('p');
-                        emptyMsg.textContent = 'Nenhum documento encontrado.';
-                        collectionDiv.appendChild(emptyMsg);
-                    } else {
-                        querySnapshot.forEach(doc => {
-                            const docDiv = document.createElement('div');
-                            docDiv.className = 'document';
-                            
-                            const docId = document.createElement('h3');
-                            docId.textContent = `Documento ID: ${doc.id}`;
-                            docDiv.appendChild(docId);
-                            
-                            const docData = document.createElement('pre');
-                            docData.textContent = JSON.stringify(doc.data(), null, 2);
-                            docDiv.appendChild(docData);
-                            
-                            collectionDiv.appendChild(docDiv);
-                        });
+                                const docId = document.createElement('h3');
+                                docId.textContent = `Documento ID: ${doc.id}`;
+                                docDiv.appendChild(docId);
+                    
+                                const docData = document.createElement('pre');
+                                docData.textContent = JSON.stringify(doc.data(), null, 2);
+                                docDiv.appendChild(docData);
+                                
+                                collectionDiv.appendChild(docDiv);
+                            });
+                        }
+                        
+                        collectionsContainer.appendChild(collectionDiv);
+                        loadingElement.classList.add('hidden');
+                    } catch (docError) {
+                        console.error(`Erro ao carregar documentos de ${collectionName}:`, docError);
+                        const errorMsg = document.createElement('p');
+                        errorMsg.style.color = 'red';
+                        errorMsg.textContent = `Erro ao carregar documentos: ${docError.message}`;
+                        collectionDiv.appendChild(errorMsg);
+                        collectionsContainer.appendChild(collectionDiv);
                     }
-                    
-                    collectionsContainer.appendChild(collectionDiv);
                 }
             } catch (error) {
                 console.error("Erro ao carregar coleções:", error);
-                collectionsContainer.innerHTML = `<p style="color: red;">Erro ao carregar dados: ${error.message}</p>`;
+                loadingElement.classList.add('hidden');
+                errorElement.textContent = `Erro ao carregar dados: ${error.message}`;
+                errorElement.classList.remove('hidden');
             }
         }
     </script>
