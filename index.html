@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dados do Firestore</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .collection-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .document-card {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8fafc;
+        }
+        h1 {
+            margin-bottom: 30px;
+            color: #343a40;
+        }
+        h2 {
+            color: #495057;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center">Dados do Firestore</h1>
+        <div id="collections-container"></div>
+        <div id="loading" class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p>Carregando dados do Firestore...</p>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <script>
+        // Configuração do Firebase com suas credenciais
+        const firebaseConfig = {
+            apiKey: "AIzaSyClmS9QnPH_HpLzN8mGW2s2PjfH4HXEAt8^",
+            projectId: "horariosite-669d1",
+        };
+
+        // Inicializa o Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Função para listar todas as coleções e seus documentos
+        async function listAllCollections() {
+            try {
+                // Obtém todas as coleções
+                const collections = await db.listCollections();
+                const container = document.getElementById('collections-container');
+                
+                if (collections.length === 0) {
+                    container.innerHTML = '<div class="alert alert-info">Nenhuma coleção encontrada no Firestore.</div>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                
+                // Para cada coleção, obtém todos os documentos
+                for (const collectionRef of collections) {
+                    const collectionName = collectionRef.id;
+                    const querySnapshot = await collectionRef.get();
+                    
+                    // Cria um container para a coleção
+                    const collectionDiv = document.createElement('div');
+                    collectionDiv.className = 'collection-container';
+                    collectionDiv.innerHTML = `<h2>Coleção: ${collectionName}</h2>`;
+                    
+                    const docsContainer = document.createElement('div');
+                    docsContainer.className = 'documents-container';
+                    
+                    if (querySnapshot.empty) {
+                        docsContainer.innerHTML = '<div class="alert alert-warning">Nenhum documento nesta coleção.</div>';
+                    } else {
+                        // Para cada documento na coleção
+                        querySnapshot.forEach(doc => {
+                            const docData = doc.data();
+                            const docDiv = document.createElement('div');
+                            docDiv.className = 'document-card';
+                            
+                            let html = `<h5>Documento ID: ${doc.id}</h5>`;
+                            html += '<table class="table table-sm table-bordered">';
+                            
+                            // Adiciona cada campo do documento
+                            for (const [key, value] of Object.entries(docData)) {
+                                html += `
+                                    <tr>
+                                        <td><strong>${key}</strong></td>
+                                        <td>${formatValue(value)}</td>
+                                    </tr>
+                                `;
+                            }
+                            
+                            html += '</table>';
+                            docDiv.innerHTML = html;
+                            docsContainer.appendChild(docDiv);
+                        });
+                    }
+                    
+                    collectionDiv.appendChild(docsContainer);
+                    container.appendChild(collectionDiv);
+                }
+                
+                // Esconde o indicador de carregamento
+                document.getElementById('loading').style.display = 'none';
+            } catch (error) {
+                console.error("Erro ao carregar dados:", error);
+                document.getElementById('collections-container').innerHTML = `
+                    <div class="alert alert-danger">
+                        Ocorreu um erro ao carregar os dados: ${error.message}
+                    </div>
+                `;
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Função para formatar valores especiais (como Timestamp)
+        function formatValue(value) {
+            if (value === null) return 'null';
+            if (value === undefined) return 'undefined';
+            
+            // Verifica se é um Timestamp do Firestore
+            if (typeof value === 'object' && value.toDate) {
+                return value.toDate().toLocaleString();
+            }
+            
+            // Verifica se é um objeto ou array
+            if (typeof value === 'object') {
+                return JSON.stringify(value, null, 2);
+            }
+            
+            return value;
+        }
+
+        // Carrega os dados quando a página estiver pronta
+        document.addEventListener('DOMContentLoaded', listAllCollections);
+    </script>
+</body>
+</html>
