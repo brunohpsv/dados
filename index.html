@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dados do Firestore</title>
+    <title>Dados do Firestore - horariosite</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -45,12 +45,30 @@
             padding: 10px;
             border-radius: 5px;
             overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        .field-name {
+            font-weight: bold;
+            min-width: 200px;
+        }
+        .array-item {
+            margin-left: 20px;
+            padding: 2px 5px;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            display: inline-block;
+            margin-bottom: 5px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="text-center">Dados do Firestore</h1>
+        <h1 class="text-center">Dados do Firestore - horariosite</h1>
         <div id="collections-container"></div>
         <div id="loading" class="loading">
             <div class="spinner-border text-primary" role="status">
@@ -75,20 +93,53 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Array com os nomes das coleções que você quer mostrar
-        // Como não podemos listar todas as coleções no cliente,
-        // você precisa conhecer os nomes das coleções antecipadamente
-        const collectionNames = [
-            // Adicione aqui os nomes de TODAS as suas coleções
-            // Exemplo:
-            // "usuarios", 
-            // "horarios",
-            // "aulas"
-            // Substitua pelos nomes reais das suas coleções
-        ];
+        // Objeto com as coleções que você quer mostrar
+        const collectionsToShow = {
+            "usuarios": "Usuários",
+            "horarios": "Horários"
+        };
+
+        // Função para formatar valores especiais
+        function formatValue(value) {
+            if (value === null) return '<span class="text-muted">null</span>';
+            if (value === undefined) return '<span class="text-muted">undefined</span>';
+            
+            // Timestamp do Firestore
+            if (typeof value === 'object' && value.toDate) {
+                return `<span class="timestamp">${value.toDate().toLocaleString()}</span>`;
+            }
+            
+            // Objetos
+            if (typeof value === 'object' && !Array.isArray(value)) {
+                let html = '<div class="bg-light p-2 rounded">';
+                for (const [key, val] of Object.entries(value)) {
+                    html += `<div><strong>${key}:</strong> ${formatValue(val)}</div>`;
+                }
+                html += '</div>';
+                return html;
+            }
+            
+            // Arrays
+            if (Array.isArray(value)) {
+                if (value.length === 0) return '<span class="text-muted">[array vazio]</span>';
+                let html = '<div>';
+                value.forEach((item, index) => {
+                    html += `<div class="array-item">${index}: ${formatValue(item)}</div>`;
+                });
+                html += '</div>';
+                return html;
+            }
+            
+            // Strings com aspas
+            if (typeof value === 'string') {
+                return `"${value}"`;
+            }
+            
+            return value;
+        }
 
         // Função para carregar todos os documentos de uma coleção
-        async function loadCollection(collectionName) {
+        async function loadCollection(collectionName, displayName) {
             try {
                 const querySnapshot = await db.collection(collectionName).get();
                 const container = document.getElementById('collections-container');
@@ -96,7 +147,7 @@
                 // Cria um container para a coleção
                 const collectionDiv = document.createElement('div');
                 collectionDiv.className = 'collection-container';
-                collectionDiv.innerHTML = `<h2>Coleção: ${collectionName}</h2>`;
+                collectionDiv.innerHTML = `<h2>${displayName} <small class="text-muted">(${collectionName})</small></h2>`;
                 
                 const docsContainer = document.createElement('div');
                 docsContainer.className = 'documents-container';
@@ -111,8 +162,19 @@
                         docDiv.className = 'document-card';
                         
                         let html = `<h5>Documento ID: ${doc.id}</h5>`;
-                        html += '<pre>' + JSON.stringify(docData, null, 2) + '</pre>';
+                        html += '<table class="table table-sm">';
                         
+                        // Adiciona cada campo do documento
+                        for (const [key, value] of Object.entries(docData)) {
+                            html += `
+                                <tr>
+                                    <td class="field-name">${key}</td>
+                                    <td>${formatValue(value)}</td>
+                                </tr>
+                            `;
+                        }
+                        
+                        html += '</table>';
                         docDiv.innerHTML = html;
                         docsContainer.appendChild(docDiv);
                     });
@@ -138,19 +200,9 @@
                 const container = document.getElementById('collections-container');
                 container.innerHTML = '';
                 
-                if (collectionNames.length === 0) {
-                    container.innerHTML = `
-                        <div class="alert alert-info">
-                            Nenhuma coleção configurada para exibição.<br>
-                            Edite o código e adicione os nomes das coleções no array 'collectionNames'.
-                        </div>
-                    `;
-                    return;
-                }
-                
                 // Carrega cada coleção sequencialmente
-                for (const collectionName of collectionNames) {
-                    await loadCollection(collectionName);
+                for (const [collectionName, displayName] of Object.entries(collectionsToShow)) {
+                    await loadCollection(collectionName, displayName);
                 }
                 
                 // Esconde o indicador de carregamento
