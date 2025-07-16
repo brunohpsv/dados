@@ -1,64 +1,80 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dados Firestore</title>
+    <title>Dados Firestore em Tempo Real</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
         body { font-family: Arial; padding: 20px; }
-        pre { background: #f0f0f0; padding: 10px; border-radius: 5px; }
-        .error { color: red; font-weight: bold; }
-        .success { color: green; }
+        .collection { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .document { margin: 10px 0; padding: 10px; background: #f9f9f9; }
+        pre { background: #f0f0f0; padding: 10px; }
     </style>
 </head>
 <body>
-    <h1>Dados do Firestore</h1>
-    <div id="debug"></div>
-    <pre id="data">Carregando...</pre>
+    <h1>Dados em Tempo Real</h1>
+    <div id="data"></div>
 
     <script>
-        // 1. DEBUG INICIAL
-        const debug = document.getElementById('debug');
-        const dataElement = document.getElementById('data');
-        
-        debug.innerHTML += '<p class="success">1. Página carregada</p>';
-        
-        // 2. CONFIGURAÇÃO DO FIREBASE
-        try {
-            debug.innerHTML += '<p class="success">2. Firebase configurado</p>';
-            
-            firebase.initializeApp({
-                apiKey: "AIzaSyClmS9QnPH_HpLzN8mGW2s2PjfH4HXEAt8",
-                projectId: "horariosite-669d1"
-            });
-            
-            const db = firebase.firestore();
-            
-            // 3. TESTE DE CONEXÃO
-            debug.innerHTML += '<p>3. Testando conexão com Firestore...</p>';
-            
-            // Tenta acessar uma coleção específica que você sabe que existe
-            db.collection("horarios").get().then(snapshot => {
-                if (snapshot.empty) {
-                    debug.innerHTML += '<p class="error">3.1. Coleção encontrada mas vazia</p>';
-                } else {
-                    debug.innerHTML += `<p class="success">3.1. Sucesso! ${snapshot.size} documentos encontrados</p>`;
-                    
-                    // Mostra os dados brutos para debug
-                    const docs = [];
-                    snapshot.forEach(doc => {
-                        docs.push({ id: doc.id, data: doc.data() });
-                    });
-                    dataElement.textContent = JSON.stringify(docs, null, 2);
-                }
-            }).catch(error => {
-                debug.innerHTML += `<p class="error">3.1. ERRO: ${error.message}</p>`;
-                console.error("Erro detalhado:", error);
-            });
-            
-        } catch (error) {
-            debug.innerHTML += `<p class="error">2.1 ERRO: ${error.message}</p>`;
+        // Configuração do Firebase (USE SEUS DADOS)
+        firebase.initializeApp({
+            apiKey: "AIzaSyClmS9QnPH_HpLzN8mGW2s2PjfH4HXEAt8",
+            projectId: "horariosite-669d1"
+        });
+
+        const db = firebase.firestore();
+        const dataDiv = document.getElementById('data');
+
+        // Função para monitorar TODAS as coleções
+        async function monitorAllCollections() {
+            try {
+                // Primeiro obtém a lista de coleções
+                const collections = await db.listCollections();
+                
+                // Para cada coleção, cria um listener em tempo real
+                collections.forEach(collectionRef => {
+                    monitorCollection(collectionRef.id);
+                });
+                
+                // Monitora novas coleções (opcional - requer configuração adicional)
+                // Esta parte é mais complexa e pode requerer Cloud Functions
+                
+            } catch (error) {
+                console.error("Erro:", error);
+                dataDiv.innerHTML = `<p class="error">Erro: ${error.message}</p>`;
+            }
         }
+
+        // Função para monitorar uma coleção específica
+        function monitorCollection(collectionName) {
+            const collectionDiv = document.createElement('div');
+            collectionDiv.className = 'collection';
+            collectionDiv.innerHTML = `<h2>Coleção: ${collectionName}</h2>`;
+            dataDiv.appendChild(collectionDiv);
+
+            // Listener em tempo real
+            db.collection(collectionName).onSnapshot(snapshot => {
+                // Limpa os documentos antigos
+                const oldDocuments = collectionDiv.querySelectorAll('.document');
+                oldDocuments.forEach(doc => doc.remove());
+                
+                // Adiciona os novos documentos
+                snapshot.forEach(doc => {
+                    const docDiv = document.createElement('div');
+                    docDiv.className = 'document';
+                    docDiv.innerHTML = `
+                        <h3>Documento: ${doc.id}</h3>
+                        <pre>${JSON.stringify(doc.data(), null, 2)}</pre>
+                    `;
+                    collectionDiv.appendChild(docDiv);
+                });
+            }, error => {
+                console.error(`Erro na coleção ${collectionName}:`, error);
+            });
+        }
+
+        // Inicia o monitoramento
+        monitorAllCollections();
     </script>
 </body>
 </html>
