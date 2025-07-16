@@ -1,158 +1,77 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dados do Firestore</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .collection { margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
-        .document { margin-bottom: 15px; padding: 10px; background-color: #f9f9f9; border-left: 4px solid #4285f4; }
-        h1 { color: #4285f4; }
-        h2 { color: #34a853; }
-        pre { background-color: #f1f1f1; padding: 10px; border-radius: 3px; overflow-x: auto; }
-        .hidden { display: none; }
-        #auth-container { margin-bottom: 20px; }
-        #password { padding: 8px; width: 200px; }
-        #login-btn { padding: 8px 15px; background-color: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        #loading { margin: 20px; font-style: italic; }
-        #error { color: red; margin: 20px; }
+        body { font-family: Arial; padding: 20px; }
+        .collection { background: #f0f0f0; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .document { background: white; padding: 10px; margin: 10px 0; border-left: 4px solid #4285f4; }
+        pre { white-space: pre-wrap; }
     </style>
 </head>
 <body>
-    <div id="auth-container">
-        <h1>Acesso Restrito</h1>
-        <input type="password" id="password" placeholder="Digite a senha">
-        <button id="login-btn">Acessar</button>
-    </div>
-    
-    <div id="content" class="hidden">
-        <h1>Dados do Firestore</h1>
-        <div id="loading">Carregando dados...</div>
-        <div id="error" class="hidden"></div>
-        <div id="collections"></div>
-    </div>
+    <h1>Dados do Firestore</h1>
+    <div id="data"></div>
 
     <script>
-        // Configuração do Firebase
-        const firebaseConfig = {
+        // Configuração direta do Firebase
+        firebase.initializeApp({
             apiKey: "AIzaSyClmS9QnPH_HpLzN8mGW2s2PjfH4HXEAt8",
             projectId: "horariosite-669d1"
-        };
-
-        // Inicializa o Firebase
-        try {
-            firebase.initializeApp(firebaseConfig);
-            console.log("Firebase inicializado com sucesso");
-            const db = firebase.firestore();
-            
-            // Teste de conexão
-            db.collection("test").doc("test").get()
-                .then(() => console.log("Conexão com Firestore OK"))
-                .catch(e => console.error("Erro ao conectar ao Firestore:", e));
-                
-        } catch (error) {
-            console.error("Erro ao inicializar Firebase:", error);
-            document.getElementById('error').textContent = `Erro ao inicializar Firebase: ${error.message}`;
-            document.getElementById('error').classList.remove('hidden');
-        }
-
-        // Senha para acesso
-        const PAGE_PASSWORD = "senhaSegura123";
-
-        // Elementos da página
-        const authContainer = document.getElementById('auth-container');
-        const content = document.getElementById('content');
-        const passwordInput = document.getElementById('password');
-        const loginBtn = document.getElementById('login-btn');
-        const collectionsContainer = document.getElementById('collections');
-        const loadingElement = document.getElementById('loading');
-        const errorElement = document.getElementById('error');
-
-        // Verifica a senha
-        loginBtn.addEventListener('click', () => {
-            if (passwordInput.value === PAGE_PASSWORD) {
-                authContainer.classList.add('hidden');
-                content.classList.remove('hidden');
-                loadCollections();
-            } else {
-                alert("Senha incorreta!");
-            }
         });
 
-        // Carrega todas as coleções do Firestore
-        async function loadCollections() {
+        const db = firebase.firestore();
+        const dataContainer = document.getElementById('data');
+
+        // Função para carregar e mostrar todos os dados
+        async function loadAllData() {
             try {
-                loadingElement.textContent = "Carregando coleções...";
-                
+                // Primeiro obtém todas as coleções
                 const collections = await db.listCollections();
-                console.log("Coleções encontradas:", collections.map(c => c.id));
                 
                 if (collections.length === 0) {
-                    loadingElement.textContent = "Nenhuma coleção encontrada no banco de dados.";
+                    dataContainer.innerHTML = "<p>Nenhuma coleção encontrada.</p>";
                     return;
                 }
-                
-                loadingElement.classList.add('hidden');
-                
+
+                // Para cada coleção, pega todos os documentos
                 for (const collectionRef of collections) {
-                    const collectionName = collectionRef.id;
                     const collectionDiv = document.createElement('div');
                     collectionDiv.className = 'collection';
+                    collectionDiv.innerHTML = `<h2>Coleção: ${collectionRef.id}</h2>`;
                     
-                    const collectionTitle = document.createElement('h2');
-                    collectionTitle.textContent = `Coleção: ${collectionName}`;
-                    collectionDiv.appendChild(collectionTitle);
+                    const querySnapshot = await collectionRef.get();
                     
-                    // Carrega todos os documentos da coleção
-                    try {
-                        loadingElement.textContent = `Carregando documentos da coleção ${collectionName}...`;
-                        loadingElement.classList.remove('hidden');
-                        
-                        const querySnapshot = await collectionRef.get();
-                        console.log(`Documentos em ${collectionName}:`, querySnapshot.size);
-                        
-                        if (querySnapshot.empty) {
-                            const emptyMsg = document.createElement('p');
-                            emptyMsg.textContent = 'Nenhum documento encontrado.';
-                            collectionDiv.appendChild(emptyMsg);
-                        } else {
-                            querySnapshot.forEach(doc => {
-                                const docDiv = document.createElement('div');
-                                docDiv.className = 'document';
-                    
-                                const docId = document.createElement('h3');
-                                docId.textContent = `Documento ID: ${doc.id}`;
-                                docDiv.appendChild(docId);
-                    
-                                const docData = document.createElement('pre');
-                                docData.textContent = JSON.stringify(doc.data(), null, 2);
-                                docDiv.appendChild(docData);
-                                
-                                collectionDiv.appendChild(docDiv);
-                            });
-                        }
-                        
-                        collectionsContainer.appendChild(collectionDiv);
-                        loadingElement.classList.add('hidden');
-                    } catch (docError) {
-                        console.error(`Erro ao carregar documentos de ${collectionName}:`, docError);
-                        const errorMsg = document.createElement('p');
-                        errorMsg.style.color = 'red';
-                        errorMsg.textContent = `Erro ao carregar documentos: ${docError.message}`;
-                        collectionDiv.appendChild(errorMsg);
-                        collectionsContainer.appendChild(collectionDiv);
+                    if (querySnapshot.empty) {
+                        collectionDiv.innerHTML += "<p>Nenhum documento nesta coleção.</p>";
+                    } else {
+                        querySnapshot.forEach(doc => {
+                            const docDiv = document.createElement('div');
+                            docDiv.className = 'document';
+                            docDiv.innerHTML = `
+                                <h3>ID: ${doc.id}</h3>
+                                <pre>${JSON.stringify(doc.data(), null, 2)}</pre>
+                            `;
+                            collectionDiv.appendChild(docDiv);
+                        });
                     }
+                    
+                    dataContainer.appendChild(collectionDiv);
                 }
             } catch (error) {
-                console.error("Erro ao carregar coleções:", error);
-                loadingElement.classList.add('hidden');
-                errorElement.textContent = `Erro ao carregar dados: ${error.message}`;
-                errorElement.classList.remove('hidden');
+                dataContainer.innerHTML = `
+                    <p style="color: red;">Erro ao carregar dados:</p>
+                    <pre>${error.message}</pre>
+                    <p>Verifique o console para detalhes.</p>
+                `;
+                console.error("Erro completo:", error);
             }
         }
+
+        // Inicia o carregamento
+        loadAllData();
     </script>
 </body>
 </html>
