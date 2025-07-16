@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dados do Firestore</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .collection { margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+        .document { margin-bottom: 15px; padding: 10px; background-color: #f9f9f9; border-left: 4px solid #4285f4; }
+        h1 { color: #4285f4; }
+        h2 { color: #34a853; }
+        pre { background-color: #f1f1f1; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .hidden { display: none; }
+        #auth-container { margin-bottom: 20px; }
+        #password { padding: 8px; width: 200px; }
+        #login-btn { padding: 8px 15px; background-color: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="auth-container" class="hidden">
+        <h1>Acesso Restrito</h1>
+        <input type="password" id="password" placeholder="Digite a senha">
+        <button id="login-btn">Acessar</button>
+    </div>
+    
+    <div id="content" class="hidden">
+        <h1>Dados do Firestore</h1>
+        <div id="collections"></div>
+    </div>
+
+    <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyClmS9QnPH_HpLzN8mGW2s2PjfH4HXEAt8",
+            projectId: "horariosite-669d1"
+        };
+
+        // Inicializa o Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Senha para acesso (substitua por uma senha forte)
+        const PAGE_PASSWORD = "senhaSegura123";
+
+        // Elementos da página
+        const authContainer = document.getElementById('auth-container');
+        const content = document.getElementById('content');
+        const passwordInput = document.getElementById('password');
+        const loginBtn = document.getElementById('login-btn');
+        const collectionsContainer = document.getElementById('collections');
+
+        // Mostra o formulário de autenticação
+        authContainer.classList.remove('hidden');
+
+        // Verifica a senha
+        loginBtn.addEventListener('click', () => {
+            if (passwordInput.value === PAGE_PASSWORD) {
+                authContainer.classList.add('hidden');
+                content.classList.remove('hidden');
+                loadCollections();
+            } else {
+                alert("Senha incorreta!");
+            }
+        });
+
+        // Carrega todas as coleções do Firestore
+        async function loadCollections() {
+            try {
+                const collections = await db.listCollections();
+                
+                for (const collectionRef of collections) {
+                    const collectionName = collectionRef.id;
+                    const collectionDiv = document.createElement('div');
+                    collectionDiv.className = 'collection';
+                    
+                    const collectionTitle = document.createElement('h2');
+                    collectionTitle.textContent = `Coleção: ${collectionName}`;
+                    collectionDiv.appendChild(collectionTitle);
+                    
+                    // Carrega todos os documentos da coleção
+                    const querySnapshot = await collectionRef.get();
+                    
+                    if (querySnapshot.empty) {
+                        const emptyMsg = document.createElement('p');
+                        emptyMsg.textContent = 'Nenhum documento encontrado.';
+                        collectionDiv.appendChild(emptyMsg);
+                    } else {
+                        querySnapshot.forEach(doc => {
+                            const docDiv = document.createElement('div');
+                            docDiv.className = 'document';
+                            
+                            const docId = document.createElement('h3');
+                            docId.textContent = `Documento ID: ${doc.id}`;
+                            docDiv.appendChild(docId);
+                            
+                            const docData = document.createElement('pre');
+                            docData.textContent = JSON.stringify(doc.data(), null, 2);
+                            docDiv.appendChild(docData);
+                            
+                            collectionDiv.appendChild(docDiv);
+                        });
+                    }
+                    
+                    collectionsContainer.appendChild(collectionDiv);
+                }
+            } catch (error) {
+                console.error("Erro ao carregar coleções:", error);
+                collectionsContainer.innerHTML = `<p style="color: red;">Erro ao carregar dados: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
