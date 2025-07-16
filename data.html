@@ -1,209 +1,63 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dados do Firestore</title>
+    <title>Dados Firestore</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            color: #333;
-            border-bottom: 2px solid #4285f4;
-            padding-bottom: 10px;
-        }
-        .collection-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-            padding: 20px;
-        }
-        .collection-title {
-            color: #4285f4;
-            margin-top: 0;
-        }
-        .document {
-            background: #f9f9f9;
-            border-left: 4px solid #34a853;
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 4px;
-        }
-        .document-id {
-            font-weight: bold;
-            color: #333;
-            margin-top: 0;
-        }
-        .field {
-            margin-bottom: 8px;
-        }
-        .field-name {
-            font-weight: bold;
-            color: #555;
-        }
-        .array-item, .map-item {
-            margin-left: 20px;
-            padding-left: 10px;
-            border-left: 2px solid #ddd;
-        }
-        .loading {
-            font-style: italic;
-            color: #666;
-        }
-        .error {
-            color: #d32f2f;
-            background: #ffebee;
-            padding: 10px;
-            border-radius: 4px;
-        }
+        body { font-family: Arial; padding: 20px; }
+        pre { background: #f0f0f0; padding: 10px; border-radius: 5px; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; }
     </style>
 </head>
 <body>
     <h1>Dados do Firestore</h1>
-    <div id="loading" class="loading">Carregando dados do Firestore...</div>
-    <div id="data-container"></div>
+    <div id="debug"></div>
+    <pre id="data">Carregando...</pre>
 
     <script>
-        // Configuração do Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyClmS9QnPH_HpLzN8mGW2s2PjfH4HXEAt8",
-            projectId: "horariosite-669d1"
-        };
-
-        // Inicializa o Firebase
+        // 1. DEBUG INICIAL
+        const debug = document.getElementById('debug');
+        const dataElement = document.getElementById('data');
+        
+        debug.innerHTML += '<p class="success">1. Página carregada</p>';
+        
+        // 2. CONFIGURAÇÃO DO FIREBASE
         try {
-            firebase.initializeApp(firebaseConfig);
+            debug.innerHTML += '<p class="success">2. Firebase configurado</p>';
+            
+            firebase.initializeApp({
+                apiKey: "AIzaSyClmS9QnPH_HpLzN8mGW2s2PjfH4HXEAt8",
+                projectId: "horariosite-669d1"
+            });
+            
             const db = firebase.firestore();
             
-            // Elementos da página
-            const loadingElement = document.getElementById('loading');
-            const dataContainer = document.getElementById('data-container');
+            // 3. TESTE DE CONEXÃO
+            debug.innerHTML += '<p>3. Testando conexão com Firestore...</p>';
             
-            // Função para formatar o valor do campo
-            function formatFieldValue(value) {
-                if (value === null) return 'null';
-                if (value === undefined) return 'undefined';
-                
-                if (Array.isArray(value)) {
-                    let html = '<div class="array-field">';
-                    value.forEach((item, index) => {
-                        html += `<div class="array-item">[${index}]: ${formatFieldValue(item)}</div>`;
+            // Tenta acessar uma coleção específica que você sabe que existe
+            db.collection("horarios").get().then(snapshot => {
+                if (snapshot.empty) {
+                    debug.innerHTML += '<p class="error">3.1. Coleção encontrada mas vazia</p>';
+                } else {
+                    debug.innerHTML += `<p class="success">3.1. Sucesso! ${snapshot.size} documentos encontrados</p>`;
+                    
+                    // Mostra os dados brutos para debug
+                    const docs = [];
+                    snapshot.forEach(doc => {
+                        docs.push({ id: doc.id, data: doc.data() });
                     });
-                    html += '</div>';
-                    return html;
+                    dataElement.textContent = JSON.stringify(docs, null, 2);
                 }
-                
-                if (typeof value === 'object' && value !== null) {
-                    let html = '<div class="map-field">';
-                    Object.keys(value).forEach(key => {
-                        html += `<div class="map-item"><span class="field-name">${key}:</span> ${formatFieldValue(value[key])}</div>`;
-                    });
-                    html += '</div>';
-                    return html;
-                }
-                
-                return value.toString();
-            }
+            }).catch(error => {
+                debug.innerHTML += `<p class="error">3.1. ERRO: ${error.message}</p>`;
+                console.error("Erro detalhado:", error);
+            });
             
-            // Função para carregar e exibir todos os dados
-            async function loadAllData() {
-                try {
-                    // Obtém todas as coleções
-                    const collections = await db.listCollections();
-                    
-                    if (collections.length === 0) {
-                        loadingElement.textContent = "Nenhuma coleção encontrada no Firestore.";
-                        return;
-                    }
-                    
-                    // Para cada coleção, obtém todos os documentos
-                    for (const collectionRef of collections) {
-                        const collectionName = collectionRef.id;
-                        const collectionDiv = document.createElement('div');
-                        collectionDiv.className = 'collection-container';
-                        
-                        const collectionTitle = document.createElement('h2');
-                        collectionTitle.className = 'collection-title';
-                        collectionTitle.textContent = `Coleção: ${collectionName}`;
-                        collectionDiv.appendChild(collectionTitle);
-                        
-                        const querySnapshot = await collectionRef.get();
-                        
-                        if (querySnapshot.empty) {
-                            const emptyMsg = document.createElement('p');
-                            emptyMsg.textContent = 'Esta coleção não contém documentos.';
-                            collectionDiv.appendChild(emptyMsg);
-                        } else {
-                            querySnapshot.forEach(doc => {
-                                const docDiv = document.createElement('div');
-                                docDiv.className = 'document';
-                                
-                                const docId = document.createElement('h3');
-                                docId.className = 'document-id';
-                                docId.textContent = `Documento ID: ${doc.id}`;
-                                docDiv.appendChild(docId);
-                                
-                                const docData = doc.data();
-                                Object.keys(docData).forEach(fieldName => {
-                                    const fieldDiv = document.createElement('div');
-                                    fieldDiv.className = 'field';
-                                    
-                                    const fieldNameSpan = document.createElement('span');
-                                    fieldNameSpan.className = 'field-name';
-                                    fieldNameSpan.textContent = `${fieldName}: `;
-                                    
-                                    const fieldValueDiv = document.createElement('span');
-                                    fieldValueDiv.innerHTML = formatFieldValue(docData[fieldName]);
-                                    
-                                    fieldDiv.appendChild(fieldNameSpan);
-                                    fieldDiv.appendChild(fieldValueDiv);
-                                    docDiv.appendChild(fieldDiv);
-                                });
-                                
-                                collectionDiv.appendChild(docDiv);
-                            });
-                        }
-                        
-                        dataContainer.appendChild(collectionDiv);
-                    }
-                    
-                    loadingElement.style.display = 'none';
-                } catch (error) {
-                    loadingElement.style.display = 'none';
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'error';
-                    errorDiv.innerHTML = `
-                        <p><strong>Erro ao carregar dados:</strong> ${error.message}</p>
-                        <p>Verifique:</p>
-                        <ul>
-                            <li>Se as regras do Firestore permitem leitura</li>
-                            <li>Se você está conectado à internet</li>
-                            <li>O console do navegador para detalhes (F12 > Console)</li>
-                        </ul>
-                    `;
-                    dataContainer.appendChild(errorDiv);
-                    console.error("Erro completo:", error);
-                }
-            }
-            
-            // Inicia o carregamento dos dados
-            loadAllData();
-            
-        } catch (initError) {
-            document.getElementById('loading').style.display = 'none';
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error';
-            errorDiv.textContent = `Falha ao inicializar o Firebase: ${initError.message}`;
-            document.getElementById('data-container').appendChild(errorDiv);
-            console.error("Erro de inicialização:", initError);
+        } catch (error) {
+            debug.innerHTML += `<p class="error">2.1 ERRO: ${error.message}</p>`;
         }
     </script>
 </body>
