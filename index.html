@@ -40,6 +40,12 @@
             font-size: 18px;
             color: #6c757d;
         }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
     </style>
 </head>
 <body>
@@ -69,69 +75,89 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Função para listar todas as coleções e seus documentos
-        async function listAllCollections() {
+        // Array com os nomes das coleções que você quer mostrar
+        // Como não podemos listar todas as coleções no cliente,
+        // você precisa conhecer os nomes das coleções antecipadamente
+        const collectionNames = [
+            // Adicione aqui os nomes de TODAS as suas coleções
+            // Exemplo:
+            // "usuarios", 
+            // "horarios",
+            // "aulas"
+            // Substitua pelos nomes reais das suas coleções
+        ];
+
+        // Função para carregar todos os documentos de uma coleção
+        async function loadCollection(collectionName) {
             try {
-                // Obtém todas as coleções
-                const collections = await db.listCollections();
+                const querySnapshot = await db.collection(collectionName).get();
                 const container = document.getElementById('collections-container');
                 
-                if (collections.length === 0) {
-                    container.innerHTML = '<div class="alert alert-info">Nenhuma coleção encontrada no Firestore.</div>';
-                    return;
+                // Cria um container para a coleção
+                const collectionDiv = document.createElement('div');
+                collectionDiv.className = 'collection-container';
+                collectionDiv.innerHTML = `<h2>Coleção: ${collectionName}</h2>`;
+                
+                const docsContainer = document.createElement('div');
+                docsContainer.className = 'documents-container';
+                
+                if (querySnapshot.empty) {
+                    docsContainer.innerHTML = '<div class="alert alert-warning">Nenhum documento nesta coleção.</div>';
+                } else {
+                    // Para cada documento na coleção
+                    querySnapshot.forEach(doc => {
+                        const docData = doc.data();
+                        const docDiv = document.createElement('div');
+                        docDiv.className = 'document-card';
+                        
+                        let html = `<h5>Documento ID: ${doc.id}</h5>`;
+                        html += '<pre>' + JSON.stringify(docData, null, 2) + '</pre>';
+                        
+                        docDiv.innerHTML = html;
+                        docsContainer.appendChild(docDiv);
+                    });
                 }
+                
+                collectionDiv.appendChild(docsContainer);
+                container.appendChild(collectionDiv);
+                
+            } catch (error) {
+                console.error(`Erro ao carregar coleção ${collectionName}:`, error);
+                const container = document.getElementById('collections-container');
+                container.innerHTML += `
+                    <div class="alert alert-danger">
+                        Erro ao carregar coleção ${collectionName}: ${error.message}
+                    </div>
+                `;
+            }
+        }
 
+        // Função para carregar todas as coleções
+        async function loadAllCollections() {
+            try {
+                const container = document.getElementById('collections-container');
                 container.innerHTML = '';
                 
-                // Para cada coleção, obtém todos os documentos
-                for (const collectionRef of collections) {
-                    const collectionName = collectionRef.id;
-                    const querySnapshot = await collectionRef.get();
-                    
-                    // Cria um container para a coleção
-                    const collectionDiv = document.createElement('div');
-                    collectionDiv.className = 'collection-container';
-                    collectionDiv.innerHTML = `<h2>Coleção: ${collectionName}</h2>`;
-                    
-                    const docsContainer = document.createElement('div');
-                    docsContainer.className = 'documents-container';
-                    
-                    if (querySnapshot.empty) {
-                        docsContainer.innerHTML = '<div class="alert alert-warning">Nenhum documento nesta coleção.</div>';
-                    } else {
-                        // Para cada documento na coleção
-                        querySnapshot.forEach(doc => {
-                            const docData = doc.data();
-                            const docDiv = document.createElement('div');
-                            docDiv.className = 'document-card';
-                            
-                            let html = `<h5>Documento ID: ${doc.id}</h5>`;
-                            html += '<table class="table table-sm table-bordered">';
-                            
-                            // Adiciona cada campo do documento
-                            for (const [key, value] of Object.entries(docData)) {
-                                html += `
-                                    <tr>
-                                        <td><strong>${key}</strong></td>
-                                        <td>${formatValue(value)}</td>
-                                    </tr>
-                                `;
-                            }
-                            
-                            html += '</table>';
-                            docDiv.innerHTML = html;
-                            docsContainer.appendChild(docDiv);
-                        });
-                    }
-                    
-                    collectionDiv.appendChild(docsContainer);
-                    container.appendChild(collectionDiv);
+                if (collectionNames.length === 0) {
+                    container.innerHTML = `
+                        <div class="alert alert-info">
+                            Nenhuma coleção configurada para exibição.<br>
+                            Edite o código e adicione os nomes das coleções no array 'collectionNames'.
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Carrega cada coleção sequencialmente
+                for (const collectionName of collectionNames) {
+                    await loadCollection(collectionName);
                 }
                 
                 // Esconde o indicador de carregamento
                 document.getElementById('loading').style.display = 'none';
+                
             } catch (error) {
-                console.error("Erro ao carregar dados:", error);
+                console.error("Erro ao carregar coleções:", error);
                 document.getElementById('collections-container').innerHTML = `
                     <div class="alert alert-danger">
                         Ocorreu um erro ao carregar os dados: ${error.message}
@@ -141,26 +167,8 @@
             }
         }
 
-        // Função para formatar valores especiais (como Timestamp)
-        function formatValue(value) {
-            if (value === null) return 'null';
-            if (value === undefined) return 'undefined';
-            
-            // Verifica se é um Timestamp do Firestore
-            if (typeof value === 'object' && value.toDate) {
-                return value.toDate().toLocaleString();
-            }
-            
-            // Verifica se é um objeto ou array
-            if (typeof value === 'object') {
-                return JSON.stringify(value, null, 2);
-            }
-            
-            return value;
-        }
-
         // Carrega os dados quando a página estiver pronta
-        document.addEventListener('DOMContentLoaded', listAllCollections);
+        document.addEventListener('DOMContentLoaded', loadAllCollections);
     </script>
 </body>
 </html>
