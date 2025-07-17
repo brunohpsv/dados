@@ -81,7 +81,7 @@
 <body>
     <div class="container">
         <h1 class="text-center">Dados do Firestore - horariosite</h1>
-        <div class="refresh-info">Os dados são atualizados automaticamente a cada 10 segundos</div>
+        <div class="refresh-info">Os dados são atualizados em tempo real</div>
         <div id="collections-container"></div>
         <div id="loading" class="loading">
             <div class="spinner-border text-primary" role="status">
@@ -92,9 +92,9 @@
         
         <div class="json-endpoint">
             <h3>Endpoint JSON</h3>
-            <p>Os dados das empresas estão disponíveis em formato JSON no seguinte endpoint:</p>
+            <p>Os dados estão disponíveis neste link permanente:</p>
             <div class="input-group mb-3">
-                <input type="text" class="form-control" id="json-url" value="" readonly>
+                <input type="text" class="form-control" id="json-url" value="Carregando..." readonly>
                 <button class="btn btn-outline-secondary" type="button" id="copy-btn">Copiar URL</button>
             </div>
             <button class="btn btn-primary" id="view-json-btn">Visualizar JSON Completo</button>
@@ -107,7 +107,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     
     <script>
-        // Configuração do Firebase com suas credenciais
+        // Configuração do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyClmS9QnPH_HpLzN8mGW2s2PjfH4HXEAt8",
             projectId: "horariosite-669d1",
@@ -117,33 +117,29 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Objeto com as coleções que você quer mostrar
+        // Coleções para monitorar
         const collectionsToShow = {
             "usuarios": "Usuários",
             "horarios": "Horários"
         };
 
-        // Chave para armazenar no localStorage
-        const STORAGE_KEY = 'horariosite_json_data';
-        // URL persistente para o JSON
-        let persistentJsonUrl = localStorage.getItem('horariosite_json_url') || '';
-
-        // Objeto para armazenar os dados que serão convertidos para JSON
+        // Dados para o JSON
         let jsonData = {
-            empresas: []
+            empresas: [],
+            lastUpdated: new Date().toISOString()
         };
 
-        // Função para formatar valores especiais
+        // URL fixo base (usando data URL)
+        let currentJsonUrl = "";
+
+        // Formata valores especiais
         function formatValue(value) {
-            if (value === null) return null;
-            if (value === undefined) return undefined;
+            if (value === null || value === undefined) return value;
             
-            // Timestamp do Firestore
             if (typeof value === 'object' && value.toDate) {
                 return value.toDate().toISOString();
             }
             
-            // Objetos
             if (typeof value === 'object' && !Array.isArray(value)) {
                 let obj = {};
                 for (const [key, val] of Object.entries(value)) {
@@ -152,7 +148,6 @@
                 return obj;
             }
             
-            // Arrays
             if (Array.isArray(value)) {
                 return value.map(item => formatValue(item));
             }
@@ -160,136 +155,61 @@
             return value;
         }
 
-        // Função para carregar todos os documentos de uma coleção
-        async function loadCollection(collectionName, displayName) {
-            try {
-                const querySnapshot = await db.collection(collectionName).get();
-                const container = document.getElementById('collections-container');
-                
-                // Cria um container para a coleção
-                const collectionDiv = document.createElement('div');
-                collectionDiv.className = 'collection-container';
-                collectionDiv.innerHTML = `<h2>${displayName} <small class="text-muted">(${collectionName})</small></h2>`;
-                
-                const docsContainer = document.createElement('div');
-                docsContainer.className = 'documents-container';
-                
-                if (querySnapshot.empty) {
-                    docsContainer.innerHTML = '<div class="alert alert-warning">Nenhum documento nesta coleção.</div>';
-                } else {
-                    // Para cada documento na coleção
-                    querySnapshot.forEach(doc => {
+        // Atualiza o JSON e gera o link
+        function updateJsonData() {
+            jsonData.lastUpdated = new Date().toISOString();
+            const jsonStr = JSON.stringify(jsonData, null, 2);
+            
+            // Cria um data URL permanente
+            currentJsonUrl = `data:application/json;charset=utf-8,${encodeURIComponent(jsonStr)}`;
+            
+            // Atualiza a interface
+            document.getElementById('json-url').value = currentJsonUrl;
+            document.getElementById('json-viewer').textContent = jsonStr;
+            
+            // Salva também no Firestore (opcional)
+            db.collection("_api").doc("empresas").set({
+                data: jsonStr,
+                lastUpdated: jsonData.lastUpdated
+            });
+        }
+
+        // Monitora as coleções em tempo real
+        function setupRealtimeListeners() {
+            Object.entries(collectionsToShow).forEach(([collectionName, displayName]) => {
+                db.collection(collectionName).onSnapshot((querySnapshot) => {
+                    // Limpa os dados antigos
+                    if (collectionName === "usuarios") {
+                        jsonData.empresas = [];
+                    }
+                    
+                    // Processa os documentos
+                    querySnapshot.forEach((doc) => {
                         const docData = doc.data();
                         
-                        // Adiciona dados formatados ao JSON
+                        // Adiciona ao JSON
                         if (collectionName === "usuarios" && docData.tipo === "empresa") {
                             jsonData.empresas.push({
                                 id: doc.id,
                                 ...formatValue(docData)
                             });
                         }
-                        
-                        const docDiv = document.createElement('div');
-                        docDiv.className = 'document-card';
-                        
-                        let html = `<h5>Documento ID: ${doc.id}</h5>`;
-                        html += '<table class="table table-sm">';
-                        
-                        // Adiciona cada campo do documento
-                        for (const [key, value] of Object.entries(docData)) {
-                            html += `
-                                <tr>
-                                    <td class="field-name">${key}</td>
-                                    <td>${formatValue(value)}</td>
-                                </tr>
-                            `;
-                        }
-                        
-                        html += '</table>';
-                        docDiv.innerHTML = html;
-                        docsContainer.appendChild(docDiv);
                     });
-                }
-                
-                collectionDiv.appendChild(docsContainer);
-                container.appendChild(collectionDiv);
-                
-            } catch (error) {
-                console.error(`Erro ao carregar coleção ${collectionName}:`, error);
-                const container = document.getElementById('collections-container');
-                container.innerHTML += `
-                    <div class="alert alert-danger">
-                        Erro ao carregar coleção ${collectionName}: ${error.message}
-                    </div>
-                `;
-            }
+                    
+                    // Atualiza o JSON
+                    updateJsonData();
+                    document.getElementById('loading').style.display = 'none';
+                });
+            });
         }
 
-        // Função para carregar todas as coleções
-        async function loadAllCollections() {
-            try {
-                const container = document.getElementById('collections-container');
-                container.innerHTML = '';
-                
-                // Limpa os dados do JSON antes de recarregar
-                jsonData.empresas = [];
-                
-                // Carrega cada coleção sequencialmente
-                for (const [collectionName, displayName] of Object.entries(collectionsToShow)) {
-                    await loadCollection(collectionName, displayName);
-                }
-                
-                // Esconde o indicador de carregamento
-                document.getElementById('loading').style.display = 'none';
-                
-                // Atualiza os dados no localStorage
-                updatePersistentJson();
-                
-            } catch (error) {
-                console.error("Erro ao carregar coleções:", error);
-                document.getElementById('collections-container').innerHTML = `
-                    <div class="alert alert-danger">
-                        Ocorreu um erro ao carregar os dados: ${error.message}
-                    </div>
-                `;
-                document.getElementById('loading').style.display = 'none';
-            }
-        }
-
-        // Função para atualizar o JSON persistente
-        function updatePersistentJson() {
-            const jsonStr = JSON.stringify(jsonData, null, 2);
-            
-            // Armazena os dados no localStorage
-            localStorage.setItem(STORAGE_KEY, jsonStr);
-            
-            // Se não tiver uma URL persistente, cria uma
-            if (!persistentJsonUrl) {
-                const blob = new Blob([jsonStr], {type: 'application/json'});
-                persistentJsonUrl = URL.createObjectURL(blob);
-                localStorage.setItem('horariosite_json_url', persistentJsonUrl);
-            } else {
-                // Se já existir uma URL, apenas atualiza o Blob com os novos dados
-                const blob = new Blob([jsonStr], {type: 'application/json'});
-                // Infelizmente, não podemos atualizar um Blob existente, então criamos uma nova URL
-                // Mas mantemos a referência à antiga para não quebrar links existentes
-                // (Nota: Isso pode causar vazamento de memória, mas é o melhor que podemos fazer no cliente)
-                URL.revokeObjectURL(persistentJsonUrl);
-                persistentJsonUrl = URL.createObjectURL(blob);
-                localStorage.setItem('horariosite_json_url', persistentJsonUrl);
-            }
-            
-            // Atualiza a exibição
-            document.getElementById('json-url').value = persistentJsonUrl;
-            document.getElementById('json-viewer').textContent = jsonStr;
-            
-            // Configura o botão de visualização
+        // Configura os botões
+        function setupButtons() {
             document.getElementById('view-json-btn').addEventListener('click', () => {
                 const viewer = document.getElementById('json-viewer');
                 viewer.style.display = viewer.style.display === 'none' ? 'block' : 'none';
             });
             
-            // Configura o botão de copiar
             document.getElementById('copy-btn').addEventListener('click', () => {
                 const jsonUrl = document.getElementById('json-url');
                 jsonUrl.select();
@@ -298,76 +218,10 @@
             });
         }
 
-        // Função para recarregar os dados sem recarregar a página
-        async function refreshData() {
-            try {
-                // Mostra o indicador de carregamento
-                document.getElementById('loading').style.display = 'block';
-                
-                // Limpa o container de coleções
-                document.getElementById('collections-container').innerHTML = '';
-                
-                // Limpa os dados do JSON antes de recarregar
-                jsonData.empresas = [];
-                
-                // Carrega cada coleção sequencialmente
-                for (const [collectionName, displayName] of Object.entries(collectionsToShow)) {
-                    await loadCollection(collectionName, displayName);
-                }
-                
-                // Atualiza os dados no localStorage
-                updatePersistentJson();
-                
-                // Esconde o indicador de carregamento
-                document.getElementById('loading').style.display = 'none';
-                
-            } catch (error) {
-                console.error("Erro ao atualizar dados:", error);
-                document.getElementById('loading').style.display = 'none';
-            }
-        }
-
-        // Função para configurar o refresh periódico
-        function setupPageRefresh() {
-            // Define o intervalo para recarregar os dados a cada 10 segundos
-            setInterval(refreshData, 10000);
-        }
-
-        // Carrega os dados quando a página estiver pronta e configura o recarregamento
+        // Inicialização
         document.addEventListener('DOMContentLoaded', () => {
-            // Verifica se temos dados no localStorage
-            const storedData = localStorage.getItem(STORAGE_KEY);
-            const storedUrl = localStorage.getItem('horariosite_json_url');
-            
-            if (storedData && storedUrl) {
-                // Se existirem dados armazenados, usa-os enquanto carrega os novos
-                jsonData = JSON.parse(storedData);
-                persistentJsonUrl = storedUrl;
-                
-                // Atualiza a exibição imediatamente
-                document.getElementById('json-url').value = persistentJsonUrl;
-                document.getElementById('json-viewer').textContent = storedData;
-                document.getElementById('loading').style.display = 'none';
-            }
-            
-            // Carrega os dados do Firestore
-            loadAllCollections();
-            
-            // Configura o refresh periódico
-            setupPageRefresh();
-            
-            // Configura os botões
-            document.getElementById('view-json-btn').addEventListener('click', () => {
-                const viewer = document.getElementById('json-viewer');
-                viewer.style.display = viewer.style.display === 'none' ? 'block' : 'none';
-            });
-            
-            document.getElementById('copy-btn').addEventListener('click', () => {
-                const jsonUrl = document.getElementById('json-url');
-                jsonUrl.select();
-                document.execCommand('copy');
-                alert('URL copiada para a área de transferência!');
-            });
+            setupRealtimeListeners();
+            setupButtons();
         });
     </script>
 </body>
