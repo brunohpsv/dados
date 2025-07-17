@@ -81,7 +81,7 @@
 <body>
     <div class="container">
         <h1 class="text-center">Dados do Firestore - horariosite</h1>
-        <div class="refresh-info">Os dados são atualizados automaticamente a cada 5 segundos</div>
+        <div class="refresh-info">Os dados são atualizados automaticamente a cada 10 segundos</div>
         <div id="collections-container"></div>
         <div id="loading" class="loading">
             <div class="spinner-border text-primary" role="status">
@@ -277,7 +277,7 @@
 
         // Função para recarregar a página completamente
         function setupPageRefresh() {
-            // Define o intervalo para recarregar a página a cada 5 segundos
+            // Define o intervalo para recarregar a página a cada 10 segundos
             setTimeout(() => {
                 window.location.reload(true); // O parâmetro true força recarregamento do cache
             }, 5000);
