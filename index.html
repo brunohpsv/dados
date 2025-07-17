@@ -94,7 +94,7 @@
             <h3>Endpoint JSON</h3>
             <p>Os dados das empresas estão disponíveis em formato JSON no seguinte endpoint:</p>
             <div class="input-group mb-3">
-                <input type="text" class="form-control" id="json-url" value="empresas.json" readonly>
+                <input type="text" class="form-control" id="json-url" value="" readonly>
                 <button class="btn btn-outline-secondary" type="button" id="copy-btn">Copiar URL</button>
             </div>
             <button class="btn btn-primary" id="view-json-btn">Visualizar JSON Completo</button>
@@ -237,8 +237,8 @@
                 // Esconde o indicador de carregamento
                 document.getElementById('loading').style.display = 'none';
                 
-                // Atualiza o JSON viewer
-                updateJsonViewer();
+                // Atualiza a URL do JSON
+                updateJsonUrl();
                 
             } catch (error) {
                 console.error("Erro ao carregar coleções:", error);
@@ -251,9 +251,13 @@
             }
         }
 
-        // Função para atualizar o visualizador JSON
-        function updateJsonViewer() {
+        // Função para atualizar a URL do JSON
+        function updateJsonUrl() {
             const jsonStr = JSON.stringify(jsonData, null, 2);
+            const blob = new Blob([jsonStr], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            
+            document.getElementById('json-url').value = url;
             document.getElementById('json-viewer').textContent = jsonStr;
             
             // Configura o botão de visualização
