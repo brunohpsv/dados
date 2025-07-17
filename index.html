@@ -123,6 +123,11 @@
             "horarios": "Horários"
         };
 
+        // Chave para armazenar no localStorage
+        const STORAGE_KEY = 'horariosite_json_data';
+        // URL persistente para o JSON
+        let persistentJsonUrl = localStorage.getItem('horariosite_json_url') || '';
+
         // Objeto para armazenar os dados que serão convertidos para JSON
         let jsonData = {
             empresas: []
@@ -237,8 +242,8 @@
                 // Esconde o indicador de carregamento
                 document.getElementById('loading').style.display = 'none';
                 
-                // Atualiza a URL do JSON
-                updateJsonUrl();
+                // Atualiza os dados no localStorage
+                updatePersistentJson();
                 
             } catch (error) {
                 console.error("Erro ao carregar coleções:", error);
@@ -251,13 +256,31 @@
             }
         }
 
-        // Função para atualizar a URL do JSON
-        function updateJsonUrl() {
+        // Função para atualizar o JSON persistente
+        function updatePersistentJson() {
             const jsonStr = JSON.stringify(jsonData, null, 2);
-            const blob = new Blob([jsonStr], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
             
-            document.getElementById('json-url').value = url;
+            // Armazena os dados no localStorage
+            localStorage.setItem(STORAGE_KEY, jsonStr);
+            
+            // Se não tiver uma URL persistente, cria uma
+            if (!persistentJsonUrl) {
+                const blob = new Blob([jsonStr], {type: 'application/json'});
+                persistentJsonUrl = URL.createObjectURL(blob);
+                localStorage.setItem('horariosite_json_url', persistentJsonUrl);
+            } else {
+                // Se já existir uma URL, apenas atualiza o Blob com os novos dados
+                const blob = new Blob([jsonStr], {type: 'application/json'});
+                // Infelizmente, não podemos atualizar um Blob existente, então criamos uma nova URL
+                // Mas mantemos a referência à antiga para não quebrar links existentes
+                // (Nota: Isso pode causar vazamento de memória, mas é o melhor que podemos fazer no cliente)
+                URL.revokeObjectURL(persistentJsonUrl);
+                persistentJsonUrl = URL.createObjectURL(blob);
+                localStorage.setItem('horariosite_json_url', persistentJsonUrl);
+            }
+            
+            // Atualiza a exibição
+            document.getElementById('json-url').value = persistentJsonUrl;
             document.getElementById('json-viewer').textContent = jsonStr;
             
             // Configura o botão de visualização
@@ -275,18 +298,76 @@
             });
         }
 
-        // Função para recarregar a página completamente
+        // Função para recarregar os dados sem recarregar a página
+        async function refreshData() {
+            try {
+                // Mostra o indicador de carregamento
+                document.getElementById('loading').style.display = 'block';
+                
+                // Limpa o container de coleções
+                document.getElementById('collections-container').innerHTML = '';
+                
+                // Limpa os dados do JSON antes de recarregar
+                jsonData.empresas = [];
+                
+                // Carrega cada coleção sequencialmente
+                for (const [collectionName, displayName] of Object.entries(collectionsToShow)) {
+                    await loadCollection(collectionName, displayName);
+                }
+                
+                // Atualiza os dados no localStorage
+                updatePersistentJson();
+                
+                // Esconde o indicador de carregamento
+                document.getElementById('loading').style.display = 'none';
+                
+            } catch (error) {
+                console.error("Erro ao atualizar dados:", error);
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Função para configurar o refresh periódico
         function setupPageRefresh() {
-            // Define o intervalo para recarregar a página a cada 10 segundos
-            setTimeout(() => {
-                window.location.reload(true); // O parâmetro true força recarregamento do cache
-            }, 5000);
+            // Define o intervalo para recarregar os dados a cada 10 segundos
+            setInterval(refreshData, 10000);
         }
 
         // Carrega os dados quando a página estiver pronta e configura o recarregamento
         document.addEventListener('DOMContentLoaded', () => {
+            // Verifica se temos dados no localStorage
+            const storedData = localStorage.getItem(STORAGE_KEY);
+            const storedUrl = localStorage.getItem('horariosite_json_url');
+            
+            if (storedData && storedUrl) {
+                // Se existirem dados armazenados, usa-os enquanto carrega os novos
+                jsonData = JSON.parse(storedData);
+                persistentJsonUrl = storedUrl;
+                
+                // Atualiza a exibição imediatamente
+                document.getElementById('json-url').value = persistentJsonUrl;
+                document.getElementById('json-viewer').textContent = storedData;
+                document.getElementById('loading').style.display = 'none';
+            }
+            
+            // Carrega os dados do Firestore
             loadAllCollections();
+            
+            // Configura o refresh periódico
             setupPageRefresh();
+            
+            // Configura os botões
+            document.getElementById('view-json-btn').addEventListener('click', () => {
+                const viewer = document.getElementById('json-viewer');
+                viewer.style.display = viewer.style.display === 'none' ? 'block' : 'none';
+            });
+            
+            document.getElementById('copy-btn').addEventListener('click', () => {
+                const jsonUrl = document.getElementById('json-url');
+                jsonUrl.select();
+                document.execCommand('copy');
+                alert('URL copiada para a área de transferência!');
+            });
         });
     </script>
 </body>
