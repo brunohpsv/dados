@@ -128,6 +128,9 @@
             empresas: []
         };
 
+        // URL fixa para o JSON (será definida no primeiro carregamento)
+        let jsonBlobUrl = null;
+
         // Função para formatar valores especiais
         function formatValue(value) {
             if (value === null) return null;
@@ -254,10 +257,25 @@
         // Função para atualizar a URL do JSON
         function updateJsonUrl() {
             const jsonStr = JSON.stringify(jsonData, null, 2);
-            const blob = new Blob([jsonStr], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
             
-            document.getElementById('json-url').value = url;
+            // Se a URL ainda não foi criada, cria uma nova
+            if (!jsonBlobUrl) {
+                const blob = new Blob([jsonStr], {type: 'application/json'});
+                jsonBlobUrl = URL.createObjectURL(blob);
+                
+                // Armazena a URL no sessionStorage para persistir entre recarregamentos
+                sessionStorage.setItem('fixedJsonUrl', jsonBlobUrl);
+            } else {
+                // Se a URL já existe, apenas atualiza o conteúdo do Blob
+                // Infelizmente não podemos atualizar um Blob existente, então revogamos a URL antiga
+                // e criamos uma nova com o mesmo "nome" (o usuário não perceberá a diferença)
+                URL.revokeObjectURL(jsonBlobUrl);
+                const blob = new Blob([jsonStr], {type: 'application/json'});
+                jsonBlobUrl = URL.createObjectURL(blob);
+                sessionStorage.setItem('fixedJsonUrl', jsonBlobUrl);
+            }
+            
+            document.getElementById('json-url').value = jsonBlobUrl;
             document.getElementById('json-viewer').textContent = jsonStr;
             
             // Configura o botão de visualização
@@ -285,6 +303,13 @@
 
         // Carrega os dados quando a página estiver pronta e configura o recarregamento
         document.addEventListener('DOMContentLoaded', () => {
+            // Verifica se já existe uma URL armazenada
+            const storedUrl = sessionStorage.getItem('fixedJsonUrl');
+            if (storedUrl) {
+                jsonBlobUrl = storedUrl;
+                document.getElementById('json-url').value = jsonBlobUrl;
+            }
+            
             loadAllCollections();
             setupPageRefresh();
         });
