@@ -12,6 +12,9 @@
 <body>
     <div class="container mt-5">
         <h1 class="mb-4">Lista de Dados</h1>
+        <div id="config-alert" class="alert alert-warning d-none">
+            Configuração do Firebase não encontrada. Verifique o arquivo de configuração.
+        </div>
         <div id="loading" class="text-center">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Carregando...</span>
@@ -20,6 +23,8 @@
         <ul id="data-list" class="list-group"></ul>
     </div>
 
+    <!-- Carrega a configuração primeiro -->
+    <script src="firebase-config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
