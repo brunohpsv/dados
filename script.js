@@ -6,45 +6,93 @@ const firebaseConfig = {
 };
 
 // Inicializa o Firebase
-firebase.initializeApp(firebaseConfig);
+try {
+    firebase.initializeApp(firebaseConfig);
+    console.log("Firebase inicializado com sucesso!");
+} catch (error) {
+    console.error("Erro ao inicializar Firebase:", error);
+}
+
 const db = firebase.firestore();
 
-// Referência para a coleção no Firestore
-const correlationsRef = db.collection('correlacoes'); // Substitua pelo nome da sua coleção
+// Referência para a coleção de usuários
+const usersRef = db.collection('usuarios'); // Agora usando 'usuarios'
 
 // Elemento onde a lista será renderizada
 const listElement = document.getElementById('correlations-list');
 
+// Função para formatar os dados do usuário
+function formatUserData(userData) {
+    let formatted = '';
+    for (const [key, value] of Object.entries(userData)) {
+        formatted += `<p><strong>${key}:</strong> ${JSON.stringify(value)}</p>`;
+    }
+    return formatted;
+}
+
 // Função para renderizar os dados
-function renderList(correlations) {
-    if (correlations.length === 0) {
-        listElement.innerHTML = '<p>Nenhuma correlação encontrada.</p>';
+function renderList(users) {
+    if (users.length === 0) {
+        listElement.innerHTML = `
+            <div class="empty-message">
+                <p>Nenhum usuário encontrado na coleção "usuarios".</p>
+                <p>Verifique se:</p>
+                <ul>
+                    <li>A coleção "usuarios" existe no Firestore</li>
+                    <li>Existem documentos na coleção</li>
+                    <li>As regras de segurança permitem leitura</li>
+                </ul>
+            </div>
+        `;
         return;
     }
 
-    let html = '<ul>';
-    correlations.forEach(doc => {
-        const data = doc.data();
+    let html = '<div class="users-grid">';
+    users.forEach(doc => {
+        const userData = doc.data();
         html += `
-            <li>
-                <h3>${data.nome || 'Sem nome'}</h3>
-                <p>${JSON.stringify(data)}</p>
+            <div class="user-card">
+                <h3>${userData.nome || 'Usuário sem nome'}</h3>
+                <div class="user-details">
+                    ${formatUserData(userData)}
+                </div>
                 <small>ID: ${doc.id}</small>
-            </li>
+            </div>
         `;
     });
-    html += '</ul>';
+    html += '</div>';
     listElement.innerHTML = html;
 }
 
 // Ouvinte em tempo real para atualizações
-correlationsRef.onSnapshot((snapshot) => {
-    const correlations = [];
+usersRef.onSnapshot((snapshot) => {
+    console.log("Recebida atualização do Firestore");
+    const users = [];
     snapshot.forEach(doc => {
-        correlations.push(doc);
+        console.log("Documento encontrado:", doc.id, doc.data());
+        users.push(doc);
     });
-    renderList(correlations);
+    renderList(users);
 }, (error) => {
-    console.error("Erro ao buscar dados: ", error);
-    listElement.innerHTML = '<p class="error">Erro ao carregar dados.</p>';
+    console.error("Erro ao buscar usuários:", error);
+    listElement.innerHTML = `
+        <div class="error-message">
+            <p>Erro ao carregar usuários:</p>
+            <p>${error.message}</p>
+            <p>Verifique o console para mais detalhes.</p>
+        </div>
+    `;
 });
+
+// Função de teste adicional
+async function testFirestoreConnection() {
+    try {
+        const snapshot = await db.collection('usuarios').get();
+        console.log(`Teste de conexão: ${snapshot.size} documentos encontrados em 'usuarios'`);
+    } catch (error) {
+        console.error("Erro no teste de conexão:", error);
+    }
+}
+
+// Executa o teste ao carregar
+testFirestoreConnection();
