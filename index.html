@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Dados do Firebase</title>
+    <title>Lista de Dados do Firestore</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -77,14 +77,14 @@
 </head>
 <body>
     <div class="container">
-        <h1>📊 Lista de Dados do Firebase</h1>
+        <h1>📊 Lista de Dados do Firestore</h1>
         
         <div id="connection-alert" class="alert alert-warning d-none">
             <strong>Atenção!</strong> Verificando conexão com o banco de dados...
         </div>
         
         <div id="rules-alert" class="alert alert-info d-none">
-            <strong>Informação:</strong> Configurando regras de segurança...
+            <strong>Informação:</strong> Verificando permissões de acesso...
         </div>
         
         <div id="error-alert" class="alert alert-danger d-none"></div>
@@ -93,21 +93,21 @@
             <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
                 <span class="visually-hidden">Carregando dados...</span>
             </div>
-            <p class="mt-3">Conectando ao banco de dados...</p>
+            <p class="mt-3">Conectando ao Firestore Database...</p>
         </div>
         
         <div id="data-container" class="d-none">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5>Itens armazenados:</h5>
+                <h5>Documentos encontrados:</h5>
                 <button id="refresh-btn" class="btn btn-sm btn-primary">
-                    <i class="bi bi-arrow-clockwise"></i> Atualizar
+                    🔄 Atualizar
                 </button>
             </div>
             <ul id="data-list" class="list-group"></ul>
         </div>
         
         <div id="no-data" class="alert alert-secondary d-none">
-            Nenhum dado encontrado no banco de dados.
+            Nenhum documento encontrado na coleção.
         </div>
     </div>
 
@@ -123,23 +123,28 @@
         const firebaseConfig = {
             apiKey: "AIzaSyAfk7tS6Z39uYyHnbKlwY1O1zeOx74LlQg",
             authDomain: "banco-de-dados-d253e.firebaseapp.com",
-            databaseURL: "https://banco-de-dados-d253e-default-rtdb.firebaseio.com",
             projectId: "banco-de-dados-d253e",
             storageBucket: "banco-de-dados-d253e.appspot.com",
             messagingSenderId: "1005413315224",
             appId: "1:1005413315224:web:c87d1dd951785ed4f656ed"
         };
 
-        // Nome da coleção principal (pode alterar)
-        const MAIN_COLLECTION = "dados";
+        // Nome da coleção principal no Firestore (altere conforme necessário)
+        const MAIN_COLLECTION = "horarios"; // Substitua pelo nome da sua coleção
         
         // =============================================
-        // INICIALIZAÇÃO DO FIREBASE
+        // INICIALIZAÇÃO DO FIREBASE FIRESTORE
         // =============================================
         try {
             // Inicializa o Firebase
             firebase.initializeApp(firebaseConfig);
-            const database = firebase.database();
+            const db = firebase.firestore();
+            
+            // Configuração para evitar erros de desconexão
+            db.settings({
+                experimentalForceLongPolling: true, // Importante para GitHub Pages
+                merge: true
+            });
             
             // Elementos da interface
             const loadingElement = document.getElementById('loading');
@@ -160,42 +165,54 @@
             // =============================================
             // VERIFICAÇÃO DE CONEXÃO
             // =============================================
-            const connectedRef = database.ref(".info/connected");
-            
-            connectedRef.on("value", (snap) => {
-                if (snap.val() === true) {
-                    // Conexão estabelecida
-                    connectionStatus.classList.add('connected');
-                    connectionStatus.classList.remove('disconnected');
-                    statusIcon.textContent = "🟢";
-                    statusText.textContent = "Conectado ao Firebase";
-                    connectionAlert.classList.add('d-none');
-                    
-                    // Configura as regras de segurança (simulação)
-                    setTimeout(() => {
-                        rulesAlert.classList.remove('d-none');
+            function checkConnection() {
+                db.collection(MAIN_COLLECTION).limit(1).get()
+                    .then(() => {
+                        // Conexão estabelecida
+                        connectionStatus.classList.add('connected');
+                        connectionStatus.classList.remove('disconnected');
+                        statusIcon.textContent = "🟢";
+                        statusText.textContent = "Conectado ao Firestore";
+                        connectionAlert.classList.add('d-none');
+                        
+                        // Verifica permissões
                         setTimeout(() => {
-                            rulesAlert.classList.add('d-none');
-                            loadData();
-                        }, 1500);
-                    }, 500);
-                } else {
-                    // Sem conexão
-                    connectionStatus.classList.add('disconnected');
-                    connectionStatus.classList.remove('connected');
-                    statusIcon.textContent = "🔴";
-                    statusText.textContent = "Sem conexão";
-                    connectionAlert.classList.remove('d-none');
-                    connectionAlert.innerHTML = `
-                        <strong>Atenção!</strong> Não foi possível conectar ao Firebase. 
-                        Verifique sua conexão com a internet e tente novamente.
-                    `;
-                    loadingElement.classList.add('d-none');
-                }
-            });
+                            rulesAlert.classList.remove('d-none');
+                            setTimeout(() => {
+                                rulesAlert.classList.add('d-none');
+                                loadData();
+                            }, 1500);
+                        }, 500);
+                    })
+                    .catch((error) => {
+                        // Sem conexão ou erro de permissão
+                        connectionStatus.classList.add('disconnected');
+                        connectionStatus.classList.remove('connected');
+                        statusIcon.textContent = "🔴";
+                        statusText.textContent = "Erro de conexão";
+                        connectionAlert.classList.remove('d-none');
+                        
+                        if (error.code === 'permission-denied') {
+                            connectionAlert.innerHTML = `
+                                <strong>Erro de permissão!</strong> O aplicativo não tem acesso ao Firestore.
+                                Verifique as regras de segurança no Firebase Console.
+                            `;
+                        } else {
+                            connectionAlert.innerHTML = `
+                                <strong>Erro de conexão!</strong> Não foi possível conectar ao Firestore.
+                                Verifique sua conexão com a internet: ${error.message}
+                            `;
+                        }
+                        
+                        loadingElement.classList.add('d-none');
+                    });
+            }
+            
+            // Verifica conexão inicial
+            checkConnection();
             
             // =============================================
-            // CARREGAMENTO DE DADOS
+            // CARREGAMENTO DE DADOS DO FIRESTORE
             // =============================================
             function loadData() {
                 loadingElement.classList.remove('d-none');
@@ -203,31 +220,28 @@
                 noDataElement.classList.add('d-none');
                 errorAlert.classList.add('d-none');
                 
-                try {
-                    const dataRef = database.ref(MAIN_COLLECTION);
-                    
-                    dataRef.on('value', (snapshot) => {
+                db.collection(MAIN_COLLECTION).get()
+                    .then((querySnapshot) => {
                         loadingElement.classList.add('d-none');
-                        const data = snapshot.val();
                         
-                        if (data && Object.keys(data).length > 0) {
+                        if (!querySnapshot.empty) {
                             dataList.innerHTML = '';
                             
-                            Object.keys(data).forEach(key => {
-                                const item = data[key];
+                            querySnapshot.forEach((doc) => {
                                 const li = document.createElement('li');
                                 li.className = 'list-group-item';
+                                const documentData = doc.data();
                                 
-                                // Cria o conteúdo do item (adaptar conforme sua estrutura de dados)
+                                // Cria o conteúdo do documento
                                 let content = `
                                     <div class="d-flex justify-content-between">
                                         <div>
-                                            <span class="data-key">ID:</span> ${key}<br>
+                                            <span class="data-key">ID do documento:</span> ${doc.id}<br>
                                 `;
                                 
-                                // Adiciona dinamicamente os campos do objeto
-                                for (const [field, value] of Object.entries(item)) {
-                                    content += `<span class="data-key">${field}:</span> ${value || 'Não especificado'}<br>`;
+                                // Adiciona dinamicamente os campos do documento
+                                for (const [field, value] of Object.entries(documentData)) {
+                                    content += `<span class="data-key">${field}:</span> ${formatFirestoreValue(value)}<br>`;
                                 }
                                 
                                 content += `</div></div>`;
@@ -241,14 +255,19 @@
                             noDataElement.classList.remove('d-none');
                             dataContainer.classList.add('d-none');
                         }
-                    }, (error) => {
+                    })
+                    .catch((error) => {
                         showError(`Erro ao carregar dados: ${error.message}`);
                         console.error("Detalhes do erro:", error);
                     });
-                    
-                } catch (error) {
-                    showError(`Erro no carregamento: ${error.message}`);
-                }
+            }
+            
+            // Função para formatar valores do Firestore
+            function formatFirestoreValue(value) {
+                if (value === null || value === undefined) return 'Não especificado';
+                if (value instanceof Date) return value.toLocaleString();
+                if (typeof value === 'object') return JSON.stringify(value);
+                return value;
             }
             
             // =============================================
@@ -262,10 +281,10 @@
             }
             
             // Botão de atualização
-            refreshBtn.addEventListener('click', loadData);
-            
-            // Inicia o carregamento dos dados
-            loadData();
+            refreshBtn.addEventListener('click', () => {
+                checkConnection();
+                loadData();
+            });
             
         } catch (error) {
             document.getElementById('loading').innerHTML = `
