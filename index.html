@@ -3,87 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horários Escolares</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Dados do Firestore</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f7fa;
-            padding: 20px;
-        }
-        .container {
-            max-width: 900px;
-            margin: 30px auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 25px;
-            text-align: center;
-        }
-        .card {
-            margin-bottom: 15px;
-            border-left: 4px solid #3498db;
-        }
-        .card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        .card-header {
-            background-color: #3498db;
-            color: white;
-            font-weight: bold;
-        }
-        .connection-status {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            z-index: 1000;
-            background-color: #2ecc71;
-            color: white;
-        }
-        .loading {
-            text-align: center;
-            padding: 30px;
-        }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 10px; margin: 5px 0; background: #f0f0f0; border-radius: 5px; }
+        .loading { margin: 20px; font-weight: bold; }
+        .error { color: red; margin: 20px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📚 Horários Escolares</h1>
-        
-        <div id="loading" class="loading">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-            <p class="mt-3">Carregando horários...</p>
-        </div>
-        
-        <div id="error-alert" class="alert alert-danger d-none"></div>
-        
-        <div id="data-container" class="d-none">
-            <div id="horarios-list"></div>
-        </div>
-    </div>
-
-    <div id="connection-status" class="connection-status d-none">
-        Conectado ao Firebase
-    </div>
+    <h1>Dados do Firestore</h1>
+    <div id="loading" class="loading">Carregando dados...</div>
+    <div id="error" class="error" style="display: none;"></div>
+    <ul id="data-list"></ul>
 
     <script>
         // Configuração do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyAfk7tS6Z39uYyHnbKlwY1O1zeOx74LlQg",
             authDomain: "banco-de-dados-d253e.firebaseapp.com",
-            databaseURL: "https://banco-de-dados-d253e-default-rtdb.firebaseio.com",
             projectId: "banco-de-dados-d253e",
             storageBucket: "banco-de-dados-d253e.appspot.com",
             messagingSenderId: "1005413315224",
@@ -92,67 +33,41 @@
 
         // Inicializa o Firebase
         firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        const db = firebase.firestore();
 
-        // Elementos da interface
-        const loadingElement = document.getElementById('loading');
-        const dataContainer = document.getElementById('data-container');
-        const errorAlert = document.getElementById('error-alert');
-        const horariosList = document.getElementById('horarios-list');
-        const connectionStatus = document.getElementById('connection-status');
+        // Nome da coleção que você quer acessar (ALTERE PARA O NOME DA SUA COLEÇÃO)
+        const collectionName = "usuarios"; 
 
-        // Verifica conexão
-        const connectedRef = database.ref(".info/connected");
-        
-        connectedRef.on("value", (snap) => {
-            if (snap.val() === true) {
-                connectionStatus.classList.remove('d-none');
-                loadHorarios();
-            } else {
-                showError("Sem conexão com o banco de dados. Verifique sua internet.");
-            }
-        });
-
-        // Carrega os horários
-        function loadHorarios() {
-            const horariosRef = database.ref('horarios');
-            
-            horariosRef.on('value', (snapshot) => {
-                const data = snapshot.val();
-                loadingElement.classList.add('d-none');
+        // Carrega os dados
+        db.collection(collectionName).get()
+            .then((querySnapshot) => {
+                document.getElementById('loading').style.display = 'none';
                 
-                if (data) {
-                    horariosList.innerHTML = '';
-                    Object.keys(data).forEach(key => {
-                        const horario = data[key];
-                        const card = document.createElement('div');
-                        card.className = 'card';
-                        card.innerHTML = `
-                            <div class="card-header">
-                                ${horario.materia}
-                            </div>
-                            <div class="card-body">
-                                <p class="card-text"><strong>Horário:</strong> ${horario.horario}</p>
-                                <p class="card-text"><strong>Professor:</strong> ${horario.professor}</p>
-                            </div>
-                        `;
-                        horariosList.appendChild(card);
-                    });
-                    dataContainer.classList.remove('d-none');
-                } else {
-                    showError("Nenhum horário cadastrado ainda.");
+                if (querySnapshot.empty) {
+                    document.getElementById('data-list').innerHTML = '<li>Nenhum dado encontrado</li>';
+                    return;
                 }
-            }, (error) => {
-                showError("Erro ao carregar horários: " + error.message);
-            });
-        }
 
-        function showError(message) {
-            loadingElement.classList.add('d-none');
-            errorAlert.classList.remove('d-none');
-            errorAlert.textContent = message;
-            console.error(message);
-        }
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const li = document.createElement('li');
+                    
+                    // Cria o conteúdo - ADAPTE PARA SUA ESTRUTURA DE DADOS
+                    let content = `<strong>ID:</strong> ${doc.id}<br>`;
+                    for (const [key, value] of Object.entries(data)) {
+                        content += `<strong>${key}:</strong> ${value}<br>`;
+                    }
+                    
+                    li.innerHTML = content;
+                    document.getElementById('data-list').appendChild(li);
+                });
+            })
+            .catch((error) => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = `Erro: ${error.message}`;
+                console.error("Erro detalhado:", error);
+            });
     </script>
 </body>
 </html>
