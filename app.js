@@ -1,15 +1,4 @@
-// Configuração do Firebase
-const firebaseConfig = {
-    apiKey: "AIzaSyAfk7tS6Z39uYyHnbKlwY1O1zeOx74LlQg",
-    authDomain: "banco-de-dados-d253e.firebaseapp.com",
-    databaseURL: "https://banco-de-dados-d253e-default-rtdb.firebaseio.com",
-    projectId: "banco-de-dados-d253e",
-    storageBucket: "banco-de-dados-d253e.appspot.com",
-    messagingSenderId: "1005413315224",
-    appId: "1:1005413315224:web:c87d1dd951785ed4f656ed"
-};
-
-// Inicializa o Firebase
+// Inicializa o Firebase com a configuração do arquivo firebase-config.js
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
