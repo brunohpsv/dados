@@ -12,10 +12,12 @@
         li { padding: 10px; margin: 5px 0; background: #f0f0f0; border-radius: 5px; }
         .loading { margin: 20px; font-weight: bold; }
         .error { color: red; margin: 20px; }
+        .last-update { margin: 10px 0; color: #666; font-style: italic; }
     </style>
 </head>
 <body>
     <h1>Dados do Firestore</h1>
+    <div id="last-update" class="last-update"></div>
     <div id="loading" class="loading">Carregando dados...</div>
     <div id="error" class="error" style="display: none;"></div>
     <ul id="data-list"></ul>
@@ -38,36 +40,53 @@
         // Nome da coleção que você quer acessar (ALTERE PARA O NOME DA SUA COLEÇÃO)
         const collectionName = "usuarios"; 
 
-        // Carrega os dados
-        db.collection(collectionName).get()
-            .then((querySnapshot) => {
-                document.getElementById('loading').style.display = 'none';
-                
-                if (querySnapshot.empty) {
-                    document.getElementById('data-list').innerHTML = '<li>Nenhum dado encontrado</li>';
-                    return;
-                }
-
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    const li = document.createElement('li');
+        // Função para carregar e exibir os dados
+        function loadData() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('data-list').innerHTML = '';
+            
+            db.collection(collectionName).get()
+                .then((querySnapshot) => {
+                    document.getElementById('loading').style.display = 'none';
                     
-                    // Cria o conteúdo - ADAPTE PARA SUA ESTRUTURA DE DADOS
-                    let content = `<strong>ID:</strong> ${doc.id}<br>`;
-                    for (const [key, value] of Object.entries(data)) {
-                        content += `<strong>${key}:</strong> ${value}<br>`;
+                    // Atualiza o horário da última atualização
+                    const now = new Date();
+                    document.getElementById('last-update').textContent = 
+                        `Última atualização: ${now.toLocaleTimeString()}`;
+                    
+                    if (querySnapshot.empty) {
+                        document.getElementById('data-list').innerHTML = '<li>Nenhum dado encontrado</li>';
+                        return;
                     }
-                    
-                    li.innerHTML = content;
-                    document.getElementById('data-list').appendChild(li);
+
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        const li = document.createElement('li');
+                        
+                        // Cria o conteúdo - ADAPTE PARA SUA ESTRUTURA DE DADOS
+                        let content = `<strong>ID:</strong> ${doc.id}<br>`;
+                        for (const [key, value] of Object.entries(data)) {
+                            content += `<strong>${key}:</strong> ${value}<br>`;
+                        }
+                        
+                        li.innerHTML = content;
+                        document.getElementById('data-list').appendChild(li);
+                    });
+                })
+                .catch((error) => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error').style.display = 'block';
+                    document.getElementById('error').textContent = `Erro: ${error.message}`;
+                    console.error("Erro detalhado:", error);
                 });
-            })
-            .catch((error) => {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('error').style.display = 'block';
-                document.getElementById('error').textContent = `Erro: ${error.message}`;
-                console.error("Erro detalhado:", error);
-            });
+        }
+
+        // Carrega os dados imediatamente
+        loadData();
+
+        // Configura o intervalo para atualizar a cada 20 segundos
+        setInterval(loadData, 20000);
     </script>
 </body>
 </html>
