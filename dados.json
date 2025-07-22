@@ -1,14 +1,18 @@
 [
   {
     "id": "1",
-    "nome": "Empresa Exemplo",
+    "nome": "Empresa A",
     "servico": "Manutenção",
     "cidade": "São Paulo",
     "estado": "SP",
-    "endereco": "Rua Exemplo",
-    "numero": "123",
-    "bairro": "Centro",
     "telefone": "11999999999"
   },
-  ...
+  {
+    "id": "2",
+    "nome": "Empresa B",
+    "servico": "Consultoria",
+    "cidade": "Rio de Janeiro",
+    "estado": "RJ",
+    "telefone": "21999999999"
+  }
 ]
