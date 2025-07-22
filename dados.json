@@ -1,0 +1,14 @@
+[
+  {
+    "id": "1",
+    "nome": "Empresa Exemplo",
+    "servico": "Manutenção",
+    "cidade": "São Paulo",
+    "estado": "SP",
+    "endereco": "Rua Exemplo",
+    "numero": "123",
+    "bairro": "Centro",
+    "telefone": "11999999999"
+  },
+  ...
+]
